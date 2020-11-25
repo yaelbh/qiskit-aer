@@ -381,7 +381,7 @@ private:
   // Description: Similar to centralize_qubits, but also returns the sorted qubit vector
   //----------------------------------------------------------------
   void centralize_and_sort_qubits(const reg_t &qubits, reg_t &sorted_indexes,
-			 reg_t &centralized_qubits, bool &ordered);
+				  reg_t &centralized_qubits, bool &ordered, bool reverse_sort);
 
   //----------------------------------------------------------------
   // Function name: find_centralized_indices
@@ -391,7 +391,8 @@ private:
   void find_centralized_indices(const reg_t &qubits, 
 				reg_t &sorted_indices,
 			        reg_t &centralized_qubits, 
-			        bool & ordered) const;
+			        bool & ordered,
+				bool reverse_sort) const;
 
   //----------------------------------------------------------------
   // Function name: move_qubits_to_centralized_indices

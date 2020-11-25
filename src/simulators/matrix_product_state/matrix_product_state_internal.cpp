@@ -557,7 +557,7 @@ void MPS::apply_3_qubit_gate(const reg_t &qubits,
   reg_t new_qubits(qubits.size());
   reg_t sorted_qubits(qubits.size());
 
-  centralize_and_sort_qubits(qubits, sorted_qubits, new_qubits, ordered);
+  centralize_and_sort_qubits(qubits, sorted_qubits, new_qubits, ordered, false);
 
   // The controlled (or target) qubit, is qubit[2]. Since in new_qubits the qubits are sorted,
   // the relative position of the controlled qubit will be 0, 1, or 2 depending on
@@ -631,25 +631,13 @@ void MPS::apply_matrix_internal(const reg_t & qubits, const cmatrix_t &mat,
 void MPS::apply_multi_qubit_gate(const reg_t &qubits,
 				 const cmatrix_t &mat,
 				 bool is_diagonal) {
-  // change qubit order in the matrix
-  uint nqubits = qubits.size();
-  uint sidelen = 1 << nqubits;
-  cmatrix_t new_mat(sidelen, sidelen);
-  for (uint i=0; i<sidelen; ++i)
-    for (uint j=0; j<sidelen; ++j) {
-      uint new_i = reverse_bits(i, nqubits);
-      if (i==j)
-	new_mat(new_i, new_i) = mat(i, i);
-      else {
-	uint new_j = reverse_bits(j, nqubits);
-	new_mat(new_i, new_j) = mat(i, j);
-      }
-    }
+  reg_t reversed_qubits = qubits;
+  std::reverse(reversed_qubits.begin(), reversed_qubits.end()); 
 
-  if (is_ordered(qubits))
-    apply_matrix_to_target_qubits(qubits, new_mat, is_diagonal);
+  if (is_ordered(reversed_qubits))
+    apply_matrix_to_target_qubits(reversed_qubits, mat, is_diagonal);
   else
-    apply_unordered_multi_qubit_gate(qubits, new_mat, is_diagonal);
+    apply_unordered_multi_qubit_gate(reversed_qubits, mat, is_diagonal);
 }
 
 void MPS::apply_unordered_multi_qubit_gate(const reg_t &qubits,
@@ -659,7 +647,7 @@ void MPS::apply_unordered_multi_qubit_gate(const reg_t &qubits,
   reg_t new_qubits(qubits.size());
   reg_t sorted_qubits(qubits.size());
 
-  centralize_and_sort_qubits(qubits, sorted_qubits, new_qubits, ordered);
+  centralize_and_sort_qubits(qubits, sorted_qubits, new_qubits, ordered, true);
   apply_matrix_to_target_qubits(new_qubits, mat, is_diagonal);
 }
 
@@ -768,19 +756,21 @@ void MPS::apply_kraus_internal(const reg_t &qubits,
 void MPS::centralize_qubits(const reg_t &qubits,
 			    reg_t &new_indices, bool & ordered) {
   reg_t sorted_indices;
-  centralize_and_sort_qubits(qubits, sorted_indices, new_indices, ordered);
+  centralize_and_sort_qubits(qubits, sorted_indices, new_indices, ordered, false);
 }
 
 void MPS::centralize_and_sort_qubits(const reg_t &qubits, reg_t &sorted_indices,
-			             reg_t &centralized_qubits, bool & ordered) {
-  find_centralized_indices(qubits, sorted_indices, centralized_qubits, ordered);
+			             reg_t &centralized_qubits, bool & ordered,
+				     bool reverse_sort) {
+  find_centralized_indices(qubits, sorted_indices, centralized_qubits, ordered, reverse_sort);
   move_qubits_to_centralized_indices(sorted_indices, centralized_qubits);
 }
 
 void MPS::find_centralized_indices(const reg_t &qubits, 
 				   reg_t &sorted_indices,
 				   reg_t &centralized_qubits, 
-				   bool & ordered) const {
+				   bool & ordered,
+				   bool reverse_sort) const {
   sorted_indices = qubits;
   uint_t num_qubits = qubits.size();
 
@@ -792,13 +782,19 @@ void MPS::find_centralized_indices(const reg_t &qubits,
   }
 
   for (uint_t index=0; index < num_qubits-1; index++) {
-    if (qubits[index] > qubits[index+1]){
+    if ((!reverse_sort && qubits[index] > qubits[index+1]) ||
+	(reverse_sort && qubits[index] < qubits[index+1])) {
       ordered = false;
       break;
     }
   }
-  if (!ordered)
-      sort(sorted_indices.begin(), sorted_indices.end());
+  if (!ordered) {
+    sort(sorted_indices.begin(), sorted_indices.end());
+    if(reverse_sort) {
+      std::cout << "hi" << std::endl;
+      std::reverse(sorted_indices.begin(), sorted_indices.end());
+    }
+  }
 
   centralized_qubits = calc_new_indices(sorted_indices);
 }
@@ -913,7 +909,7 @@ void MPS::MPS_with_new_indices(const reg_t &qubits,
   temp_MPS.initialize(*this);
   bool ordered = true;
   temp_MPS.centralize_and_sort_qubits(qubits, sorted_qubits, 
-				      centralized_qubits, ordered);
+				      centralized_qubits, ordered, false);
 
 }
 
